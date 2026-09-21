@@ -1,0 +1,16 @@
+{
+  "name": "Ficha Clínica · Animales de Compañía FCV-UNR",
+  "short_name": "Ficha Clínica",
+  "description": "Historia clínica veterinaria digital, offline-first, basada en la Ficha Técnica de la Cátedra de Clínica de Animales de Compañía (FCV - UNR).",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F8FAFC",
+  "theme_color": "#068136",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "../icon-192.png.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "../icon-512.png.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

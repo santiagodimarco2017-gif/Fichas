@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<title>Ficha Clínica · Animales de Compañía FCV-UNR</title>
+<meta name="description" content="Historia clínica veterinaria digital, offline-first, basada en la Ficha Técnica de la Cátedra de Clínica de Animales de Compañía (FCV - UNR).">
+<meta name="theme-color" content="#068136">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="../icon-192.png.png">
+<link rel="apple-touch-icon" href="../icon-192.png.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ficha Clínica">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class' };
+</script>
+<link rel="stylesheet" href="./css/styles.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
+
+  <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-700">
+    <div class="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
+      <a href="#/pacientes" class="flex items-center gap-2">
+        <span class="text-2xl">🩺</span>
+        <div class="leading-tight">
+          <div class="font-bold text-sm">Ficha Clínica</div>
+          <div class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">Animales de Compañía · FCV-UNR</div>
+        </div>
+      </a>
+      <div class="flex items-center gap-1">
+        <a href="#/config" aria-label="Ajustes" class="w-10 h-10 flex items-center justify-center rounded-full active:bg-slate-100 dark:active:bg-slate-700 text-xl">⚙️</a>
+        <button id="btn-dark-toggle" aria-label="Cambiar tema" class="w-10 h-10 flex items-center justify-center rounded-full active:bg-slate-100 dark:active:bg-slate-700 text-xl">🌓</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="app" class="max-w-2xl mx-auto"></main>
+
+  <div id="offline-badge" class="fixed top-16 left-1/2 -translate-x-1/2 z-40 bg-amber-500 text-white text-xs px-3 py-1.5 rounded-full shadow hidden">
+    Sin conexión — trabajando en modo offline
+  </div>
+
+  <script src="./js/utils.js"></script>
+  <script src="./js/db.js"></script>
+  <script src="./js/ficha-fcv.js"></script>
+  <script src="./js/render.js"></script>
+  <script src="./js/whatsapp.js"></script>
+  <script src="./js/pdf-export.js"></script>
+  <script src="./js/cloud-sync.js"></script>
+  <script src="./js/app.js"></script>
+  <script>
+    function actualizarEstadoConexion() {
+      document.getElementById('offline-badge').classList.toggle('hidden', navigator.onLine);
+    }
+    window.addEventListener('online', actualizarEstadoConexion);
+    window.addEventListener('offline', actualizarEstadoConexion);
+    actualizarEstadoConexion();
+  </script>
+</body>
+</html>
