@@ -264,6 +264,62 @@
         renderInto(Render.consultaScreen(f, p));
         return;
       }
+
+      if (e.target.id === 'btn-add-recordatorio') {
+        f.recordatorios = f.recordatorios || [];
+        f.recordatorios.push(FCV.nuevoRecordatorio());
+        await guardar(f);
+        renderInto(Render.consultaScreen(f, p));
+        return;
+      }
+      const quitarRecordatorio = e.target.closest('[data-remove-recordatorio]');
+      if (quitarRecordatorio) {
+        f.recordatorios.splice(parseInt(quitarRecordatorio.dataset.removeRecordatorio, 10), 1);
+        await guardar(f);
+        renderInto(Render.consultaScreen(f, p));
+        return;
+      }
+      const btnAgendar = e.target.closest('[data-agendar-recordatorio]');
+      if (btnAgendar) {
+        const i = parseInt(btnAgendar.dataset.agendarRecordatorio, 10);
+        const original = btnAgendar.textContent;
+        btnAgendar.textContent = 'Agendando...'; btnAgendar.disabled = true;
+        try {
+          const cfg = await CloudSync.getConfig();
+          const { googleEventId, googleEventLink } = await CalendarSync.agendarEvento(p, f.recordatorios[i], cfg.gdriveClientId);
+          f.recordatorios[i].googleEventId = googleEventId;
+          f.recordatorios[i].googleEventLink = googleEventLink;
+          await guardar(f);
+          renderInto(Render.consultaScreen(f, p));
+          showToast('Evento agendado en Google Calendar ✅', 'ok');
+        } catch (err) {
+          console.error(err);
+          showToast(err.message + ' — configurá el Client ID de Google en Ajustes.', 'error');
+          btnAgendar.textContent = original; btnAgendar.disabled = false;
+        }
+        return;
+      }
+      const btnCancelarRecordatorio = e.target.closest('[data-cancelar-recordatorio]');
+      if (btnCancelarRecordatorio) {
+        const i = parseInt(btnCancelarRecordatorio.dataset.cancelarRecordatorio, 10);
+        const original = btnCancelarRecordatorio.textContent;
+        btnCancelarRecordatorio.textContent = 'Cancelando...'; btnCancelarRecordatorio.disabled = true;
+        try {
+          const cfg = await CloudSync.getConfig();
+          await CalendarSync.cancelarEvento(f.recordatorios[i].googleEventId, cfg.gdriveClientId);
+          f.recordatorios[i].googleEventId = '';
+          f.recordatorios[i].googleEventLink = '';
+          await guardar(f);
+          renderInto(Render.consultaScreen(f, p));
+          showToast('Evento cancelado en Google Calendar', 'ok');
+        } catch (err) {
+          console.error(err);
+          showToast(err.message, 'error');
+          btnCancelarRecordatorio.textContent = original; btnCancelarRecordatorio.disabled = false;
+        }
+        return;
+      }
+
       if (e.target.closest('#btn-pdf')) {
         try {
           const doc = PdfExport.generarPdfFicha(p, f);
@@ -322,8 +378,8 @@
             ${Render.field({ label: 'Tenant', path: 'msalTenant', value: cfg.msalTenant || 'common', hint: 'Usá "common" si no tenés un tenant corporativo propio.' })}
           </div>
           <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 mt-3">
-            <h3 class="text-sm font-semibold mb-2">Google Drive</h3>
-            ${Render.field({ label: 'Client ID (Google Cloud OAuth)', path: 'gdriveClientId', value: cfg.gdriveClientId })}
+            <h3 class="text-sm font-semibold mb-2">Google (Drive + Calendar)</h3>
+            ${Render.field({ label: 'Client ID (Google Cloud OAuth)', path: 'gdriveClientId', value: cfg.gdriveClientId, hint: 'Se usa tanto para el respaldo en Google Drive como para agendar recordatorios en Google Calendar. Habilitá ambas APIs en tu proyecto de Google Cloud.' })}
           </div>
         </div>
         <button id="btn-guardar-config" class="w-full rounded-xl bg-emerald-600 text-white py-3 text-sm font-medium mt-4">Guardar ajustes</button>

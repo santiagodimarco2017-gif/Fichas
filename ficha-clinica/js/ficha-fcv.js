@@ -150,6 +150,18 @@ const FCV = (() => {
   ];
 
   // ---------------------------------------------------------------------
+  // Recordatorios / próximas citas (se pueden agendar en Google Calendar).
+  // ---------------------------------------------------------------------
+  const TIPOS_RECORDATORIO = ['Vacunación', 'Desparasitación', 'Visita de control', 'Otro'];
+
+  function nuevoRecordatorio() {
+    return {
+      id: Utils.uuid(), tipo: 'Vacunación', fecha: '', hora: '', notas: '',
+      googleEventId: '', googleEventLink: '',
+    };
+  }
+
+  // ---------------------------------------------------------------------
   // Factories de objetos por defecto.
   // ---------------------------------------------------------------------
   function nuevoPaciente() {
@@ -204,6 +216,7 @@ const FCV = (() => {
         indicacionesInmediatas: '',
         prescripciones: [],
       },
+      recordatorios: [],
     };
   }
 
@@ -216,6 +229,7 @@ const FCV = (() => {
     VACUNAS_BASE, nuevaVacunaEntry, OPCIONES_ULTIMA_DESPARASITACION,
     PARES_SEMIOLOGICOS, SISTEMAS_EOP, GANGLIOS, GANGLIOS_LABEL,
     METODOS_COMPLEMENTARIOS, nuevoMetodoEntry, CLASIFICACION_DIAGNOSTICO_DEFINITIVO,
+    TIPOS_RECORDATORIO, nuevoRecordatorio,
     nuevoPaciente, nuevaFicha, nuevaPrescripcion,
   };
 })();

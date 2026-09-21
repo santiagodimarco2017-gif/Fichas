@@ -107,6 +107,18 @@ const Utils = (() => {
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  /** Inyecta un <script> externo una sola vez (usado por los conectores OAuth de Google/Microsoft). */
+  function cargarScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) return resolve();
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error(`No se pudo cargar ${src}. Verificá tu conexión.`));
+      document.head.appendChild(s);
+    });
+  }
+
   function fileToDataURL(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -133,6 +145,6 @@ const Utils = (() => {
   return {
     getPath, setPath, uuid, generarHCId, debounce, todayISO,
     formatFechaLarga, formatFechaCorta, calcEdad, formatEdad,
-    escapeHtml, fileToDataURL, calcularVolumenDosis
+    escapeHtml, fileToDataURL, calcularVolumenDosis, cargarScript
   };
 })();

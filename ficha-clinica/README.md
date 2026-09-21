@@ -17,7 +17,7 @@ ficha-clinica/
 ├── manifest.json        # metadata instalable
 ├── sw.js                 # service worker (cache offline del app shell)
 ├── css/styles.css        # ajustes que Tailwind (CDN) no cubre + impresión
-├── icons/                # íconos 192/512
+│                          # (los íconos 192/512 reutilizan los del repo raíz)
 └── js/
     ├── utils.js           # helpers: rutas anidadas, fechas, edad, dosis
     ├── db.js               # capa IndexedDB (pacientes, fichas, ajustes)
@@ -26,6 +26,7 @@ ficha-clinica/
     ├── whatsapp.js         # resumen en lenguaje llano + enlace WhatsApp
     ├── pdf-export.js       # PDF membretado (jsPDF + autoTable)
     ├── cloud-sync.js       # OneDrive / Google Drive / Webhook
+    ├── calendar-sync.js    # recordatorios en Google Calendar
     └── app.js              # router, autoguardado y wiring de eventos
 ```
 
@@ -90,18 +91,34 @@ la carpeta y subir los archivos donde vos quieras (OneDrive, Drive, SharePoint, 
 5. Copiá el **Application (client) ID** y pegalo en **Ajustes → OneDrive → Client ID**.
 6. La primera vez que uses "Respaldar en la nube" con OneDrive, se abre un popup de login de Microsoft.
 
-### Google Drive (OAuth2 con Google Identity Services)
+### Google Drive y Google Calendar (OAuth2 con Google Identity Services)
+Ambas funciones —respaldo en Drive y agendar recordatorios en Calendar—
+comparten el mismo Client ID de Google Cloud; solo hace falta cargarlo una
+vez en **Ajustes → Google (Drive + Calendar)**.
+
 1. Andá a [Google Cloud Console → APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials).
-2. Habilitá la **Google Drive API** en el proyecto.
+2. Habilitá la **Google Drive API** y la **Google Calendar API** en el proyecto (Library → buscá cada una → Enable).
 3. Creá credenciales tipo **OAuth 2.0 Client ID**, aplicación tipo "Web application".
 4. En **Authorized JavaScript origins**, agregá el dominio donde publicaste la app (ej. `https://tu-usuario.github.io`).
-5. Copiá el **Client ID** y pegalo en **Ajustes → Google Drive → Client ID**.
-6. La primera vez que uses "Respaldar en la nube" con Google Drive, se abre un popup de consentimiento.
+5. En la pantalla de consentimiento OAuth, agregá los scopes `.../auth/drive.file` y `.../auth/calendar.events` (son de acceso mínimo: la app solo puede tocar los archivos/eventos que ella misma crea, no todo tu Drive ni todo tu calendario).
+6. Copiá el **Client ID** y pegalo en **Ajustes → Google (Drive + Calendar) → Client ID**.
+7. La primera vez que uses "Respaldar en la nube" o "Agendar en Google Calendar", se abre un popup de consentimiento (uno para cada función, porque piden permisos distintos).
 
-En ambos casos, cada respaldo crea/usa la carpeta
+En OneDrive y Google Drive, cada respaldo crea/usa la carpeta
 `Historias_Clinicas/[Especie]_[NombrePaciente]_[Tutor]_[HC-ID]/` y sube
 `historia_clinica.json` (respaldo estructurado) y `ficha_clinica.pdf`
 (documento membretado).
+
+### Recordatorios en Google Calendar
+
+Dentro de cada consulta, la sección **"Recordatorios y próximas citas"**
+permite cargar una próxima vacunación, desparasitación, visita de control
+u otro evento (tipo, fecha, hora opcional y notas) y agendarlo con un
+toque. Si no cargás hora, el evento queda como "todo el día"; si cargás
+hora, dura 30 minutos por defecto. Cada evento se crea con un recordatorio
+automático (notificación) 24 horas antes, y con el botón "Ver evento"
+podés abrirlo directamente en Google Calendar. También se puede cancelar
+el evento desde la misma tarjeta sin salir de la app.
 
 ## Funcionalidades clave
 
@@ -114,6 +131,8 @@ En ambos casos, cada respaldo crea/usa la carpeta
 - **Exportación a PDF** membretado de 3 páginas (jsPDF + autoTable).
 - **Resumen para el tutor** en lenguaje llano, con envío directo por
   WhatsApp (`api.whatsapp.com/send`).
+- **Recordatorios en Google Calendar** para próximas vacunaciones,
+  desparasitaciones y visitas de control, con notificación automática.
 - **Modo oscuro** persistente para trabajar de noche.
 
 ## Notas
