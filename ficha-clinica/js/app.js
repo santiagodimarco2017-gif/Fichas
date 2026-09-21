@@ -1,0 +1,362 @@
+// app.js — router, autoguardado y orquestación de la PWA.
+'use strict';
+
+(() => {
+  // #app es reemplazado por un clon vacío en cada cambio de ruta (ver
+  // resetAppContainer) para que los listeners delegados de la pantalla
+  // anterior no queden pegados y se disparen varias veces en la nueva.
+  let appEl = document.getElementById('app');
+  const VITAL_BASE_CLASS = 'w-full rounded-xl border-2 px-3 py-2.5 text-base focus:ring-2 focus:ring-emerald-500 outline-none';
+
+  function resetAppContainer() {
+    const clone = appEl.cloneNode(false);
+    appEl.replaceWith(clone);
+    appEl = clone;
+  }
+
+  // ------------------------------------------------------------- utilidades UI
+
+  function showToast(msg, type = 'info') {
+    const el = document.createElement('div');
+    const colores = { info: 'bg-slate-800', ok: 'bg-emerald-600', error: 'bg-red-600' };
+    el.className = `fixed left-1/2 -translate-x-1/2 bottom-6 z-50 text-white text-sm px-4 py-3 rounded-xl shadow-lg ${colores[type] || colores.info} max-w-[90vw] text-center`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => { el.style.transition = 'opacity .4s'; el.style.opacity = '0'; }, 2600);
+    setTimeout(() => el.remove(), 3200);
+  }
+
+  function renderInto(html) {
+    const abiertos = {};
+    appEl.querySelectorAll('details[id]').forEach(d => { abiertos[d.id] = d.open; });
+    appEl.innerHTML = html;
+    appEl.querySelectorAll('details[id]').forEach(d => {
+      if (d.id in abiertos) d.open = abiertos[d.id];
+    });
+  }
+
+  // ------------------------------------------------------------- data binding
+
+  function bindGenericForm(container, data, { onSave, onStructuralChange }) {
+    const debouncedSave = Utils.debounce(() => onSave(data), 500);
+
+    container.addEventListener('input', (e) => {
+      const el = e.target;
+      if (!el.dataset.path) return;
+      const value = el.type === 'checkbox' ? el.checked : el.value;
+      Utils.setPath(data, el.dataset.path, value);
+      debouncedSave();
+
+      if (el.dataset.vital) {
+        const rango = FCV.RANGOS_VITALES[data.__especie || 'canino'][el.dataset.vital.split('.').pop()];
+        if (rango) {
+          const estado = FCV.evaluarConstante(value, rango);
+          const cls = estado === 'alerta'
+            ? 'border-red-400 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+            : estado === 'normal'
+              ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+              : 'border-slate-300 dark:border-slate-600';
+          el.className = VITAL_BASE_CLASS + ' ' + cls;
+        }
+      }
+
+      const rxMatch = el.dataset.path.match(/^tratamiento\.prescripciones\.(\d+)\.(dosisMgKg|concentracionMgMl)$/);
+      if (rxMatch || el.dataset.path === 'peso') {
+        recalcularDosis(container, data);
+      }
+    });
+
+    container.addEventListener('change', (e) => {
+      const el = e.target;
+      if (!el.dataset.path) return;
+      const value = el.type === 'checkbox' ? el.checked : el.value;
+      Utils.setPath(data, el.dataset.path, value);
+      onSave(data);
+      if (onStructuralChange) onStructuralChange();
+    });
+  }
+
+  function recalcularDosis(scopeEl, ficha) {
+    (ficha.tratamiento.prescripciones || []).forEach((rx, i) => {
+      const div = scopeEl.querySelector(`#rx-calc-${i}`) || document.querySelector(`#rx-calc-${i}`);
+      if (!div) return;
+      const calc = Utils.calcularVolumenDosis(rx.dosisMgKg, ficha.peso, rx.concentracionMgMl);
+      div.innerHTML = Render.rxCalcHtml(calc, ficha.peso);
+    });
+  }
+
+  async function bindFileInputs(container, data, onSave, rerender) {
+    container.addEventListener('change', async (e) => {
+      const el = e.target;
+      if (el.dataset.fileTarget && el.files && el.files.length) {
+        const actual = Utils.getPath(data, el.dataset.fileTarget) || [];
+        for (const file of Array.from(el.files)) {
+          try {
+            const dataUrl = await Utils.fileToDataURL(file);
+            actual.push({ nombre: file.name, tipo: file.type, dataUrl });
+          } catch (_e) { /* se ignora archivo no legible */ }
+        }
+        Utils.setPath(data, el.dataset.fileTarget, actual);
+        await onSave(data);
+        rerender();
+      }
+    });
+    container.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-file-remove]');
+      if (!btn) return;
+      const path = btn.dataset.fileRemove;
+      const idx = parseInt(btn.dataset.fileIndex, 10);
+      const arr = Utils.getPath(data, path) || [];
+      arr.splice(idx, 1);
+      Utils.setPath(data, path, arr);
+      await onSave(data);
+      rerender();
+    });
+  }
+
+  function bindQuickInsert(container, data, onSave) {
+    container.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-quick-insert]');
+      if (!btn) return;
+      const path = btn.dataset.quickInsert;
+      const actual = Utils.getPath(data, path) || '';
+      const agregado = actual.trim() ? `${actual.trim()}. ${btn.dataset.quickText}` : btn.dataset.quickText;
+      Utils.setPath(data, path, agregado);
+      const textarea = container.querySelector(`[data-path="${path}"]`);
+      if (textarea) textarea.value = agregado;
+      onSave(data);
+    });
+  }
+
+  // ------------------------------------------------------------- router
+
+  const routes = {
+    '': screenPacientes,
+    pacientes: screenPacientes,
+    paciente: screenPacienteDetalle,
+    consulta: screenConsulta,
+    config: screenConfig,
+  };
+
+  function parseHash() {
+    const h = (location.hash || '#/pacientes').replace(/^#\/?/, '');
+    const [route, id] = h.split('/');
+    return { route, id };
+  }
+
+  async function router() {
+    const { route, id } = parseHash();
+    const fn = routes[route] || screenPacientes;
+    resetAppContainer();
+    try {
+      await fn(id);
+    } catch (err) {
+      console.error(err);
+      renderInto(`<div class="p-6 text-center text-red-600">Ocurrió un error al mostrar esta pantalla.<br><span class="text-xs text-slate-400">${Utils.escapeHtml(err.message)}</span></div>`);
+    }
+    window.scrollTo(0, 0);
+  }
+
+  // ------------------------------------------------------------- pantallas
+
+  async function screenPacientes() {
+    const patients = await DB.patients.getAll();
+    const fichas = await DB.fichas.getAll();
+    const ultimaPorPaciente = {};
+    fichas.forEach(f => {
+      if (!ultimaPorPaciente[f.patientId] || f.fechaAtencion > ultimaPorPaciente[f.patientId].fechaAtencion) {
+        ultimaPorPaciente[f.patientId] = f;
+      }
+    });
+    renderInto(Render.patientListScreen(patients, ultimaPorPaciente));
+
+    document.getElementById('btn-nuevo-paciente').addEventListener('click', async () => {
+      const p = FCV.nuevoPaciente();
+      await DB.patients.put(p);
+      location.hash = `#/paciente/${p.id}`;
+    });
+
+    const buscador = document.getElementById('buscador-pacientes');
+    buscador.addEventListener('input', Utils.debounce(() => {
+      const q = buscador.value.trim().toLowerCase();
+      const filtrados = !q ? patients : patients.filter(p =>
+        (p.paciente.nombre || '').toLowerCase().includes(q) ||
+        (p.tutor.nombre || '').toLowerCase().includes(q) ||
+        p.id.toLowerCase().includes(q));
+      document.getElementById('lista-pacientes').innerHTML = Render.patientListItems(filtrados, ultimaPorPaciente);
+    }, 200));
+  }
+
+  async function screenPacienteDetalle(id) {
+    const p = await DB.patients.get(id);
+    if (!p) { location.hash = '#/pacientes'; return; }
+    const fichas = await DB.fichas.getByPatient(id);
+    renderInto(Render.patientDetailScreen(p, fichas));
+
+    const guardar = async (data) => {
+      data.updatedAt = new Date().toISOString();
+      await DB.patients.put(data);
+    };
+    const contBase = document.getElementById('form-paciente-base');
+    bindGenericForm(contBase, p, {
+      onSave: guardar,
+      onStructuralChange: () => { renderInto(Render.patientDetailScreen(p, fichas)); rebind(); },
+    });
+
+    function rebind() {
+      const c = document.getElementById('form-paciente-base');
+      bindGenericForm(c, p, {
+        onSave: guardar,
+        onStructuralChange: () => { renderInto(Render.patientDetailScreen(p, fichas)); rebind(); },
+      });
+      document.getElementById('btn-nueva-consulta').addEventListener('click', crearConsulta);
+    }
+
+    document.getElementById('btn-nueva-consulta').addEventListener('click', crearConsulta);
+    async function crearConsulta() {
+      // `p` ya tiene en memoria los últimos cambios tecleados (setPath corre
+      // sincrónico en cada input); forzamos el guardado antes de navegar para
+      // no perder una edición reciente que el autoguardado debounced todavía
+      // no haya escrito en IndexedDB.
+      await guardar(p);
+      const f = FCV.nuevaFicha(p.id);
+      await DB.fichas.put(f);
+      location.hash = `#/consulta/${f.id}`;
+    }
+  }
+
+  // Nota: `#app` es un nodo persistente (solo su innerHTML se reemplaza en
+  // cada renderInto). Los listeners delegados de esta pantalla se atan una
+  // única vez sobre ese nodo; nunca se vuelven a atar tras un re-render,
+  // porque duplicarían el binding y cada evento se dispararía N veces.
+  async function screenConsulta(id) {
+    const f = await DB.fichas.get(id);
+    if (!f) { location.hash = '#/pacientes'; return; }
+    const p = await DB.patients.get(f.patientId);
+    f.__especie = p.paciente.especie;
+    renderInto(Render.consultaScreen(f, p));
+
+    const guardar = async (data) => {
+      data.updatedAt = new Date().toISOString();
+      const { __especie, ...limpio } = data;
+      await DB.fichas.put(limpio);
+    };
+
+    const root = appEl;
+    bindGenericForm(root, f, {
+      onSave: guardar,
+      onStructuralChange: () => renderInto(Render.consultaScreen(f, p)),
+    });
+    bindFileInputs(root, f, guardar, () => renderInto(Render.consultaScreen(f, p)));
+    bindQuickInsert(root, f, guardar);
+
+    root.addEventListener('click', async (e) => {
+      if (e.target.id === 'btn-add-rx') {
+        f.tratamiento.prescripciones.push(FCV.nuevaPrescripcion());
+        await guardar(f);
+        renderInto(Render.consultaScreen(f, p));
+        return;
+      }
+      const quitar = e.target.closest('[data-remove-rx]');
+      if (quitar) {
+        f.tratamiento.prescripciones.splice(parseInt(quitar.dataset.removeRx, 10), 1);
+        await guardar(f);
+        renderInto(Render.consultaScreen(f, p));
+        return;
+      }
+      if (e.target.closest('#btn-pdf')) {
+        try {
+          const doc = PdfExport.generarPdfFicha(p, f);
+          doc.save(PdfExport.nombreArchivo(p, f));
+          showToast('PDF generado ✅', 'ok');
+        } catch (err) {
+          console.error(err);
+          showToast('No se pudo generar el PDF: ' + err.message, 'error');
+        }
+        return;
+      }
+      if (e.target.closest('#btn-whatsapp')) {
+        if (!p.tutor.telefono) showToast('Cargá el teléfono del tutor para enviar por WhatsApp.', 'error');
+        WhatsApp.abrirResumen(p, f);
+        return;
+      }
+      const btnCloud = e.target.closest('#btn-cloud-sync');
+      if (btnCloud) {
+        const original = btnCloud.textContent;
+        btnCloud.textContent = 'Subiendo...'; btnCloud.disabled = true;
+        try {
+          const resultado = await CloudSync.respaldar(p, f);
+          showToast(`Respaldado en ${resultado.provider}: ${resultado.carpeta}`, 'ok');
+        } catch (err) {
+          console.error(err);
+          showToast(err.message + ' — configurá el respaldo en Ajustes.', 'error');
+        } finally {
+          btnCloud.textContent = original; btnCloud.disabled = false;
+        }
+        return;
+      }
+      if (e.target.closest('#btn-finalizar')) {
+        f.status = f.status === 'finalizada' ? 'borrador' : 'finalizada';
+        await guardar(f);
+        renderInto(Render.consultaScreen(f, p));
+      }
+    });
+  }
+
+  async function screenConfig() {
+    const cfg = await CloudSync.getConfig();
+    renderInto(`
+      <div class="p-4 pb-28">
+        <a href="#/pacientes" class="text-sm text-emerald-700 dark:text-emerald-400 mb-3 inline-block">← Pacientes</a>
+        <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">Ajustes de respaldo en la nube</h2>
+        <p class="text-xs text-slate-500 mb-4">Elegí un conector. Las credenciales quedan guardadas solo en este dispositivo (IndexedDB), nunca se envían a un servidor propio.</p>
+        <div id="form-config">
+          ${Render.radioGroup({ label: 'Conector activo', path: 'provider', value: cfg.provider, options: [{ value: 'webhook', label: 'Webhook (n8n / Make / Power Automate)' }, { value: 'onedrive', label: 'OneDrive (Microsoft Graph)' }, { value: 'gdrive', label: 'Google Drive' }] })}
+          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 mt-3">
+            <h3 class="text-sm font-semibold mb-2">Webhook genérico</h3>
+            ${Render.field({ label: 'URL del Webhook', path: 'webhookUrl', value: cfg.webhookUrl, extra: 'placeholder="https://tu-n8n.dominio.com/webhook/ficha-clinica"' })}
+          </div>
+          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 mt-3">
+            <h3 class="text-sm font-semibold mb-2">OneDrive (Microsoft Graph / MSAL)</h3>
+            ${Render.field({ label: 'Client ID (Azure AD App Registration)', path: 'msalClientId', value: cfg.msalClientId })}
+            ${Render.field({ label: 'Tenant', path: 'msalTenant', value: cfg.msalTenant || 'common', hint: 'Usá "common" si no tenés un tenant corporativo propio.' })}
+          </div>
+          <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 mt-3">
+            <h3 class="text-sm font-semibold mb-2">Google Drive</h3>
+            ${Render.field({ label: 'Client ID (Google Cloud OAuth)', path: 'gdriveClientId', value: cfg.gdriveClientId })}
+          </div>
+        </div>
+        <button id="btn-guardar-config" class="w-full rounded-xl bg-emerald-600 text-white py-3 text-sm font-medium mt-4">Guardar ajustes</button>
+      </div>`);
+
+    const cont = document.getElementById('form-config');
+    bindGenericForm(cont, cfg, { onSave: () => {}, onStructuralChange: () => {} });
+    document.getElementById('btn-guardar-config').addEventListener('click', async () => {
+      await CloudSync.setConfig(cfg);
+      showToast('Ajustes guardados ✅', 'ok');
+    });
+  }
+
+  // ------------------------------------------------------------- tema oscuro
+
+  async function initDarkMode() {
+    const guardado = await DB.settings.get('darkMode');
+    const prefiereOscuro = guardado ?? window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.classList.toggle('dark', prefiereOscuro);
+    document.getElementById('btn-dark-toggle').addEventListener('click', async () => {
+      const activo = document.documentElement.classList.toggle('dark');
+      await DB.settings.put('darkMode', activo);
+    });
+  }
+
+  // ------------------------------------------------------------- arranque
+
+  window.addEventListener('hashchange', router);
+  window.addEventListener('DOMContentLoaded', async () => {
+    await initDarkMode();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW no registrado', err));
+    }
+    router();
+  });
+})();
