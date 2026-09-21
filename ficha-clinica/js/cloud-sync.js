@@ -34,17 +34,6 @@ const CloudSync = (() => {
     ].join('/');
   }
 
-  function cargarScript(src) {
-    return new Promise((resolve, reject) => {
-      if (document.querySelector(`script[src="${src}"]`)) return resolve();
-      const s = document.createElement('script');
-      s.src = src;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error(`No se pudo cargar ${src}. Verificá tu conexión.`));
-      document.head.appendChild(s);
-    });
-  }
-
   async function getConfig() {
     return (await DB.settings.get('cloudConfig')) || {
       provider: 'webhook',
@@ -69,7 +58,7 @@ const CloudSync = (() => {
   // ---------------------------------------------------------------- OneDrive
 
   async function ensureMsal(cfg) {
-    await cargarScript(MSAL_SDK);
+    await Utils.cargarScript(MSAL_SDK);
     if (!msalApp) {
       msalApp = new msal.PublicClientApplication({
         auth: {
@@ -128,7 +117,7 @@ const CloudSync = (() => {
   // ------------------------------------------------------------ Google Drive
 
   async function ensureGis(cfg) {
-    await cargarScript(GIS_SDK);
+    await Utils.cargarScript(GIS_SDK);
     if (!gisTokenClient) {
       gisTokenClient = google.accounts.oauth2.initTokenClient({
         client_id: cfg.gdriveClientId,

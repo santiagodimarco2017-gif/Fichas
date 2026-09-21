@@ -419,6 +419,45 @@ const Render = (() => {
     `, { id: 'acc-tratamiento' });
   }
 
+  // --- sección 9: recordatorios / próximas citas (Google Calendar) ---------
+
+  function recordatorioCard(r, i) {
+    const agendado = !!r.googleEventId;
+    return `
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 p-3 mb-3">
+        <div class="flex justify-between items-center mb-2">
+          <span class="text-xs font-mono text-slate-400">Recordatorio ${i + 1}</span>
+          <button type="button" data-remove-recordatorio="${i}" class="text-xs text-red-600">Quitar</button>
+        </div>
+        <div class="grid grid-cols-2 gap-x-3">
+          <div class="col-span-2">${select({ label: 'Tipo', path: `recordatorios.${i}.tipo`, value: r.tipo, options: FCV.TIPOS_RECORDATORIO })}</div>
+          <div>${field({ label: 'Fecha', path: `recordatorios.${i}.fecha`, value: r.fecha, type: 'date' })}</div>
+          <div>${field({ label: 'Hora (opcional)', path: `recordatorios.${i}.hora`, value: r.hora, type: 'time', hint: 'Sin hora queda como evento de todo el día' })}</div>
+          <div class="col-span-2">${field({ label: 'Notas', path: `recordatorios.${i}.notas`, value: r.notas, extra: 'placeholder="Ej: refuerzo antirrábica, control post-quirúrgico..."' })}</div>
+        </div>
+        <div id="recordatorio-estado-${i}">
+          ${agendado ? `
+            <div class="rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 text-sm px-3 py-2 mt-1 flex items-center justify-between gap-2">
+              <span>📅 Agendado en Google Calendar</span>
+              <a href="${esc(r.googleEventLink)}" target="_blank" rel="noopener" class="underline shrink-0">Ver evento</a>
+            </div>
+            <button type="button" data-cancelar-recordatorio="${i}" class="w-full rounded-xl border border-red-300 text-red-600 py-2 text-xs font-medium mt-2">Cancelar en Google Calendar</button>
+          ` : `
+            <button type="button" data-agendar-recordatorio="${i}" class="w-full rounded-xl bg-emerald-600 text-white py-2.5 text-sm font-medium mt-1">📅 Agendar en Google Calendar</button>
+          `}
+        </div>
+      </div>`;
+  }
+
+  function seccionRecordatorios(f) {
+    const items = (f.recordatorios || []).map((r, i) => recordatorioCard(r, i)).join('');
+    return accordion('Recordatorios y próximas citas', '📅', `
+      <p class="text-xs text-slate-500 mb-3">Programá la próxima vacunación, desparasitación o visita de control y mandala directo a Google Calendar. Requiere configurar el Client ID de Google en Ajustes.</p>
+      ${items}
+      <button type="button" id="btn-add-recordatorio" class="w-full rounded-xl border-2 border-dashed border-emerald-400 text-emerald-700 dark:text-emerald-400 py-3 text-sm font-medium active:bg-emerald-50 dark:active:bg-emerald-900/30">+ Agregar recordatorio</button>
+    `, { id: 'acc-recordatorios' });
+  }
+
   // --- ficha de peso ---------------------------------------------------------
 
   function sparkline(puntos, width = 300, height = 70) {
@@ -514,6 +553,7 @@ const Render = (() => {
           ${seccionEOP(f)}
           ${seccionDiagnostico(f)}
           ${seccionTratamiento(f)}
+          ${seccionRecordatorios(f)}
         </div>
 
         <div class="grid grid-cols-2 gap-3 mt-4">

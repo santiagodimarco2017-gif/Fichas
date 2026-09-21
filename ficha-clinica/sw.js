@@ -1,7 +1,7 @@
 // sw.js — service worker offline-first para la app shell.
 // Los datos clínicos viven en IndexedDB (no en el cache del SW); acá solo se
 // cachea el código y los recursos estáticos para que la app abra sin red.
-const CACHE_NAME = 'ficha-clinica-fcv-v1';
+const CACHE_NAME = 'ficha-clinica-fcv-v2';
 
 const APP_SHELL = [
   './',
@@ -15,6 +15,7 @@ const APP_SHELL = [
   './js/whatsapp.js',
   './js/pdf-export.js',
   './js/cloud-sync.js',
+  './js/calendar-sync.js',
   './js/app.js',
   '../icon-192.png.png',
   '../icon-512.png.png',
