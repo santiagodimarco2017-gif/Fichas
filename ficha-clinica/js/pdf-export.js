@@ -192,27 +192,34 @@ const PdfExport = (() => {
       margin: { left: 10, right: 10 },
     });
 
-    // Anexo de imágenes de métodos complementarios, si hay.
+    // Anexo de resultados adjuntos (fotos y/o PDFs) de métodos complementarios.
     const conArchivos = metodosSolicitados.filter(m => m.archivos && m.archivos.length);
     if (conArchivos.length) {
       doc.addPage();
       membrete(doc, config);
       y = 30;
-      y = seccionTitulo(doc, 'Anexo — imágenes de métodos complementarios', y);
+      y = seccionTitulo(doc, 'Anexo — resultados adjuntos de métodos complementarios', y);
       conArchivos.forEach(m => {
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
         doc.text(m.tipo, 10, y);
-        y += 4;
+        y += 5;
         doc.setFont('helvetica', 'normal');
         let x = 10;
-        m.archivos.forEach(src => {
-          if (!src.startsWith('data:image')) return;
-          try {
-            doc.addImage(src, 'JPEG', x, y, 45, 45);
-          } catch (err) { /* formato no soportado por jsPDF, se omite */ }
-          x += 50;
-          if (x > 160) { x = 10; y += 50; }
+        m.archivos.forEach(archivo => {
+          const esImagen = (archivo.tipo || (typeof archivo === 'string' ? 'image/*' : '')).startsWith('image/');
+          const src = typeof archivo === 'string' ? archivo : archivo.dataUrl;
+          if (esImagen) {
+            try {
+              doc.addImage(src, 'JPEG', x, y, 45, 45);
+            } catch (err) { /* formato no soportado por jsPDF, se omite */ }
+            x += 50;
+            if (x > 160) { x = 10; y += 50; }
+          } else {
+            // No se puede incrustar el archivo (ej. PDF); se referencia por nombre.
+            doc.text(`📎 ${archivo.nombre || 'archivo adjunto'} (ver en la app / respaldo JSON)`, 10, y);
+            y += 5;
+          }
         });
         y += 52;
         if (y > 250) { doc.addPage(); membrete(doc, config); y = 30; }

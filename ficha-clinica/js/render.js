@@ -326,6 +326,23 @@ const Render = (() => {
 
   // --- sección 7: diagnóstico, pronóstico y plan ----------------------------
 
+  /** Previsualización de un adjunto: miniatura si es imagen, ícono + nombre si es PDF u otro archivo. */
+  function adjuntoPreview(archivo, path, idx) {
+    const esImagen = (archivo.tipo || '').startsWith('image/');
+    const contenido = esImagen
+      ? `<img src="${archivo.dataUrl}" class="w-16 h-16 object-cover rounded-lg border border-slate-200 dark:border-slate-600" />`
+      : `<div class="w-16 h-16 flex flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-300">
+          <span class="text-xl">📄</span>
+          <span class="text-[9px] px-1 truncate max-w-[60px]">${esc(archivo.nombre || 'archivo')}</span>
+        </div>`;
+    return `
+      <div class="relative">
+        <a href="${archivo.dataUrl}" download="${esc(archivo.nombre || 'archivo')}" target="_blank" rel="noopener" title="${esc(archivo.nombre || '')}">${contenido}</a>
+        <button type="button" data-file-remove="${path}" data-file-index="${idx}"
+          class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-white text-xs leading-5">×</button>
+      </div>`;
+  }
+
   function seccionDiagnostico(f) {
     const d = f.diagnostico;
     const metodos = d.metodosComplementarios.map((m, i) => `
@@ -336,16 +353,12 @@ const Render = (() => {
             <div>${field({ label: 'Fecha', path: `diagnostico.metodosComplementarios.${i}.fecha`, value: m.fecha, type: 'date' })}</div>
             <div class="col-span-2">${textarea({ label: 'Resultado', path: `diagnostico.metodosComplementarios.${i}.resultado`, value: m.resultado, rows: 2 })}</div>
             <div class="col-span-2">
-              <span class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Adjuntar foto / resultado</span>
-              <input type="file" accept="image/*,.pdf" capture="environment" multiple data-file-target="diagnostico.metodosComplementarios.${i}.archivos"
+              <span class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Adjuntar resultado (foto o PDF)</span>
+              <p class="text-xs text-slate-500 mb-1">Podés sacar una foto o elegir un archivo ya guardado (ej. un PDF de laboratorio).</p>
+              <input type="file" accept="image/*,application/pdf,.pdf" multiple data-file-target="diagnostico.metodosComplementarios.${i}.archivos"
                 class="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:text-white file:px-3 file:py-2" />
               <div class="flex flex-wrap gap-2 mt-2" data-file-preview="diagnostico.metodosComplementarios.${i}.archivos">
-                ${(m.archivos || []).map((a, ai) => `
-                  <div class="relative">
-                    <img src="${a}" class="w-16 h-16 object-cover rounded-lg border border-slate-200 dark:border-slate-600" />
-                    <button type="button" data-file-remove="diagnostico.metodosComplementarios.${i}.archivos" data-file-index="${ai}"
-                      class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-white text-xs leading-5">×</button>
-                  </div>`).join('')}
+                ${(m.archivos || []).map((a, ai) => adjuntoPreview(a, `diagnostico.metodosComplementarios.${i}.archivos`, ai)).join('')}
               </div>
             </div>
           </div>` : ''}

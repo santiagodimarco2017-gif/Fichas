@@ -93,7 +93,7 @@
         for (const file of Array.from(el.files)) {
           try {
             const dataUrl = await Utils.fileToDataURL(file);
-            actual.push(dataUrl);
+            actual.push({ nombre: file.name, tipo: file.type, dataUrl });
           } catch (_e) { /* se ignora archivo no legible */ }
         }
         Utils.setPath(data, el.dataset.fileTarget, actual);
@@ -214,6 +214,11 @@
 
     document.getElementById('btn-nueva-consulta').addEventListener('click', crearConsulta);
     async function crearConsulta() {
+      // `p` ya tiene en memoria los últimos cambios tecleados (setPath corre
+      // sincrónico en cada input); forzamos el guardado antes de navegar para
+      // no perder una edición reciente que el autoguardado debounced todavía
+      // no haya escrito en IndexedDB.
+      await guardar(p);
       const f = FCV.nuevaFicha(p.id);
       await DB.fichas.put(f);
       location.hash = `#/consulta/${f.id}`;
